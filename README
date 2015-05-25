@@ -1,0 +1,16 @@
+FDSStick console app
+-------------------------
+
+Run program with no arguments to see usage.
+
+Linux / OSX support is incomplete. Flash operations work, disk reading and writing doesn't.
+
+
+
+--------
+Linux:
+
+Move 95-fds.rules to /etc/udev/rules.d/
+
+libusb-1.0 is required to compile in Linux.  To install libusb-1.0 on Ubuntu and other Debian-based systems, run:
+	sudo apt-get install libusb-1.0-0-dev

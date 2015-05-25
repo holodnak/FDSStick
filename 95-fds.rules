@@ -1,0 +1,2 @@
+# Give r/w access to FDSStick
+SUBSYSTEM=="usb", ATTR{idVendor}=="16d0", ATTR{idProduct}=="0aaa", MODE="0666"
