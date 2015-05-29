@@ -71,20 +71,12 @@ int main(int argc, char** argv) {
         break;
 
     case 'r':   //readDisk -r file
-        if(argc<3)
-            help();
-        {
-            success=FDS_readDisk(NULL, argv[2]);
-            break;
-        }
+        success=FDS_readDisk(NULL, argc>2?argv[2]:NULL);
+        break;
 
-    case 'R':   //readRaw -R file
-        if(argc<3)
-            help();
-        {
-            success=FDS_readDisk(argv[2], NULL);
-            break;
-        }
+    case 'R':   //readRaw -R file.raw [file.fds]
+        success=FDS_readDisk(argc>2?argv[2]:NULL, argc>3?argv[3]:NULL);
+        break;
 /*
     case 'D':   //dump -D filename addr size
         if(argc<3)

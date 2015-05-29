@@ -12,7 +12,6 @@ Disk format in flash:
 struct {
     uint16_t filename[120];  //null terminated unicode string.  filename[0]: 0xFFFF=empty, 0x0000=multi-disk image (continued from previous)
     uint8_t reserved[14];   //set to 0
-    uint8_t modified;       //1=disk has been modified
     uint16_t lead_in;       //lead-in length (#bits), 0=default
     uint8_t data[0xff00];   //disk data, beginning with gap end mark (0x80) of first block
 }
@@ -21,12 +20,13 @@ struct {
 enum {
     DEFAULT_LEAD_IN=28300,      //#bits
     GAP=976/8-1,
+    MIN_GAP_SIZE=0x300,         //bits
     FDSSIZE=65500,          //size of .fds disk side, excluding header
-    RAWSIZE=0x10000-256,    //excludes header and lead-in
+    RAWSIZE=0x10000-256,    //size of image in flash, excluding header
     FLASHHEADERSIZE=0x100,
 };
 
-//don't include gap start
+//don't include gap end
 uint16_t calc_crc(uint8_t *buf, int size) {
     uint32_t crc=0x8000;
     int i;
@@ -74,7 +74,7 @@ int fds_to_raw(uint8_t *dst, uint8_t *src) {
     while(src[i]==3) {
         uint32_t size = (src[i+13] | (src[i+14]<<8))+1;
         if(o + 16+3 + GAP + size+3 > RAWSIZE) {
-            printf("Out of space (%d bytes short), adjust GAP size.\n",(o + 16+3 + GAP + size+3)-RAWSIZE);
+            printf("Out of space (%d bytes short), adjust GAP size?\n",(o + 16+3 + GAP + size+3)-RAWSIZE);
             return 0;
         }
         copy_block(dst+o, src+i, 16);
@@ -101,10 +101,25 @@ int fds_to_raw(uint8_t *dst, uint8_t *src) {
 */
 }
 
-enum { PRE_LEAD_IN=0x4800, MIN_GAP_SIZE=0x300, };
+
+//look for pattern of bits matching the first disk block
+static int findFirstBlock(uint8_t *buf) {
+    static const uint8_t dat[]={1,0,1,0,0,0,0,0, 0,1,2,2,1,0,1,0, 0,1,1,2,1,1,1,1, 1,1,0,0,1,1,1,0};
+    int i,len;
+    for(i=0, len=0; i<0x2000*8; i++) {
+        if(buf[i]==dat[len]) {
+            len++;
+            if(len==sizeof(dat))
+                return i-len;
+        } else {
+            i-=len;
+            len=0;
+        }
+    }
+    return 0;
+}
+
 bool block_decode(uint8_t *dst, uint8_t *src, int *inP, int *outP, int srcSize, int dstSize, int blockSize, char blockType) {
-    static const uint8_t set[]=  {0x01,0x02,0x04,0x08,0x10,0x20,0x40,0x80};
-    
     if(*outP+blockSize+2 > dstSize) {
         printf("Out of space\n");
         return false;
@@ -130,7 +145,7 @@ bool block_decode(uint8_t *dst, uint8_t *src, int *inP, int *outP, int srcSize, 
     char bitval=1;
     in++;
     do {
-        if(in>=srcSize) {   //not necessarily an error, probably just garbage at end of disk
+        if(in>=srcSize) {   //not necessarily an error, probably garbage at end of disk
             //printf("Disk end\n"); 
             return false;
         }
@@ -145,7 +160,7 @@ bool block_decode(uint8_t *dst, uint8_t *src, int *inP, int *outP, int srcSize, 
                 out++;
             case 0x01:
             case 0x10:
-                dst[out/8]|=set[out&7];
+                dst[out/8] |= 1<<(out&7);
                 out++;
                 bitval=1;
                 break;
@@ -173,14 +188,15 @@ bool block_decode(uint8_t *dst, uint8_t *src, int *inP, int *outP, int srcSize, 
         printf("Bad CRC (%04X!=%04X)\n", crc1, crc2);
     }
 
-    dst[out]=0;  //clear CRC
+    dst[out]=0;     //clear CRC
     dst[out+1]=0;
+    dst[out+2]=0;   //+spare bit
     *inP=in;
     *outP=out;
     return true;
 }
 
-int raw_to_fds(uint8_t *raw, uint8_t *fds, int rawsize) {
+static bool raw_to_fds(uint8_t *raw, uint8_t *fds, int rawsize) {
     int i;
     int in,out;
 
@@ -199,25 +215,27 @@ int raw_to_fds(uint8_t *raw, uint8_t *fds, int rawsize) {
     fwrite(raw,1,rawsize,f);
     fclose(f);
 */
-    in=PRE_LEAD_IN;
+    //lead-in can vary a lot depending on drive, scan for first block to get our bearings
+    in=findFirstBlock(raw)-MIN_GAP_SIZE;
+    if(in<0)
+        return false;
+
     out=0;
     if(!block_decode(fds, raw, &in, &out, rawsize, FDSSIZE+2, 0x38, 1))
-        return 0;
+        return false;
     if(!block_decode(fds, raw, &in, &out, rawsize, FDSSIZE+2, 2, 2))
-        return 0;
+        return false;
     do {
         if(!block_decode(fds, raw, &in, &out, rawsize, FDSSIZE+2, 16, 3))
-            return 0;
+            return true;
         if(!block_decode(fds, raw, &in, &out, rawsize, FDSSIZE+2, 1+(fds[out-16+13] | (fds[out-16+14]<<8)), 4))
-            return 0;
+            return true;
     } while(in<rawsize);
-
-    return 1;
+    return true;
 }
 
 //Only handles one side...
 bool FDS_readDisk(char *filename_raw, char *filename_fds) {
-    static const uint8_t fwHdr[]={0x46,0x44,0x53,0x1A,1,0,0,0,0,0,0,0,0,0,0,0};
     enum { READBUFSIZE=0x90000 };
 
     FILE *f;
@@ -241,27 +259,29 @@ bool FDS_readDisk(char *filename_raw, char *filename_fds) {
             printf(".");
     } while(result==DISK_READMAX && bytesIn<READBUFSIZE-DISK_READMAX);
     printf("\n");
-
     if(result<0) {
         printf("Read error.\n");
         return false;
     }
+
     if(filename_raw) {
         if( (f=fopen(filename_raw,"wb")) ) {
             fwrite(readBuf, 1, bytesIn, f);
             fclose(f);
+            printf("Wrote %s\n",filename_raw);
         }
     }
+
+    fds=(uint8_t*)malloc(FDSSIZE+16);   //extra room for CRC junk
+    raw_to_fds(readBuf, fds, bytesIn);
     if(filename_fds) {
-        fds=(uint8_t*)malloc(FDSSIZE+16);   //extra room for CRC junk
-        raw_to_fds(readBuf, fds, bytesIn);
         if( (f=fopen(filename_fds,"wb")) ) {
-            fwrite(fwHdr, 1, sizeof(fwHdr), f);
             fwrite(fds, 1, FDSSIZE, f);
             fclose(f);
+            printf("Wrote %s\n",filename_fds);
         }
-        free(fds);
     }
+    free(fds);
     free(readBuf);
     return true;
 }
@@ -284,7 +304,7 @@ static bool writeDisk(uint8_t *buf, int size) {
             printf("#");
     }
 
-    //fill remainder with empty space. EP0 will stall at end of disk
+    //Fill remainder with empty space.   Keep writing until we can't, EP0 will stall at end of disk
     memset(buf, 0xaa, DISK_WRITEMAX);
     for(bytesOut=0; bytesOut<0x20000; bytesOut+=DISK_WRITEMAX) {
         if(!dev_writeDisk(buf, DISK_WRITEMAX))
