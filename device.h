@@ -21,6 +21,10 @@ enum {
     ID_DISK_WRITE,
 };
 
+//These get filled on dev_open()
+extern int dev_flashSize;           //in bytes
+extern int dev_slots;
+
 bool dev_open();
 void dev_close();
 void dev_printLastError();

@@ -14,15 +14,16 @@ void app_exit(int exitcode) {
 void help() {
     printf(
         "\n"
-        //"    -D file [addr] [size]       dump SPI flash\n"
-        //"    -W file [addr]              write SPI flash\n"
         "    -f file.fds [1..8]          write to flash (disk slot# 1..8)\n"
-        "    -l                          list files\n"
+        "    -s file.fds [1..8]          read from flash\n"
         "    -r file.fds                 read disk\n"
-        "    -R file.raw                 read disk (raw)\n"
+        "    -R file.raw [file.bin]      read disk (raw)\n"
         "    -w file.fds                 write disk\n"
+        "    -l                          list flash contents\n"
+        "    -e [1..8 | all]             erase flash\n"
         "    -u file.fw                  update firmware\n"
-        //"    -R                          reset\n"
+        //"    -D file [addr] [size]       dump flash\n"
+        //"    -W file [addr]              write flash\n"
     );
     app_exit(1);
 }
@@ -54,9 +55,19 @@ int main(int argc, char** argv) {
             int slot=1;
             if(argc>3)
                 sscanf(argv[3],"%i",&slot);
-            if(--slot > 7)
-                slot=0;
             success=FDS_writeFlash(argv[2], slot);
+        }
+        break;
+
+    case 's': //save -s file.fds [slot]
+        if(argc<3)
+            help();
+        {
+            int slot=1;
+            if(argc>3)
+                sscanf(argv[3],"%i",&slot);
+            //TODO - name should be optional, it's already in flash
+            success=FDS_readFlashToFDS(argv[2], slot);
         }
         break;
 
@@ -70,19 +81,40 @@ int main(int argc, char** argv) {
         success=FDS_list();
         break;
 
-    case 'r':   //readDisk -r file
-        success=FDS_readDisk(NULL, argc>2?argv[2]:NULL);
+    case 'r':   //readDisk -r file.fds
+        if(argc<3)
+            help();
+        success=FDS_readDisk(NULL, NULL, argv[2]);
         break;
 
-    case 'R':   //readRaw -R file.raw [file.fds]
-        success=FDS_readDisk(argc>2?argv[2]:NULL, argc>3?argv[3]:NULL);
+    case 'R':   //readRaw -R file.raw [file.bin]
+        if(argc<3)
+            help();
+        success=FDS_readDisk(argv[2], argc>3?argv[3]:NULL, NULL);
+        break;
+
+    case 'e':   //erase -e [1..N | all]
+        if(argc<3)
+            help();
+        {
+            if(!strcmp(argv[2],"all")) {
+                success=true;
+                for(int addr=0; addr<dev_flashSize; addr+=SLOTSIZE)
+                    success &= spi_erasePage(addr);
+            } else {
+                int slot=1;
+                sscanf(argv[2],"%i",&slot);
+                success=spi_erasePage(SLOTSIZE*(slot-1));
+                //TODO - erase all slots of a game
+            }
+        }
         break;
 /*
     case 'D':   //dump -D filename addr size
         if(argc<3)
             help();
         {
-            int addr=0, size=0x80000;
+            int addr=0, size=dev_flashSize;
             if(argc>3)
                 sscanf(argv[3],"%i",&addr);
             if(argc>4)
@@ -102,9 +134,11 @@ int main(int argc, char** argv) {
             break;
         }
 
-    case 'R':   //reset -R
+    case 't':   //test ...
+        if(argc<3)
+            help();
         {
-            success=dev_reset();
+            FDS_rawToBin(argv[2], argc>3? argv[3]: NULL);
             break;
         }
 */

@@ -27,7 +27,7 @@ uint32_t spi_readID() {
     return id;
 }
 
-uint32_t spi_flashSize() {
+uint32_t spi_readFlashSize() {
     uint32_t id=spi_readID();
     switch(id) {
         case 0x138020: // ST25PE40, M25PE40: 4Mbit (512kB)
@@ -168,8 +168,6 @@ bool spi_writeFlash(uint8_t *buf, uint32_t addr, uint32_t size) {
 }
 
 bool spi_writeFile(char *filename, uint32_t addr) {
-    enum { MAXFILESIZE=0x10000 }; 
-
     uint8_t *filebuf;
     uint32_t filesize;
 
@@ -179,8 +177,8 @@ bool spi_writeFile(char *filename, uint32_t addr) {
         return false;
     }
 
-    filebuf = (uint8_t*)malloc(MAXFILESIZE);
-    filesize=fread(filebuf, 1, MAXFILESIZE, f);
+    filebuf = (uint8_t*)malloc(dev_flashSize);
+    filesize=fread(filebuf, 1, dev_flashSize, f);
     fclose(f);
 
     bool result=spi_writeFlash(filebuf, addr, filesize);

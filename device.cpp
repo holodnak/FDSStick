@@ -10,6 +10,8 @@
 #define PID 0x0aaa
 #define DEV_NAME L"FDSStick"
 
+int dev_flashSize;
+int dev_slots;
 
 static hid_device *handle=NULL;
 static uint8_t hidbuf[256];
@@ -18,10 +20,8 @@ static uint8_t hidbuf[256];
 bool dev_open() {
     struct hid_device_info *devs, *cur_dev;
     const char *path_to_open = NULL;
-    if(handle) {
-        hid_close(handle);
-        handle=NULL;
-    }
+
+    dev_close();
     devs = hid_enumerate(VID, PID);
     cur_dev = devs;
     while (cur_dev) {
@@ -34,7 +34,13 @@ bool dev_open() {
     if(cur_dev)
         handle = hid_open_path(cur_dev->path);
     if(handle) {
-        wprintf(L"Opened %s (%04X:%04X:%04X:%s)\n", cur_dev->product_string, cur_dev->vendor_id, cur_dev->product_id, cur_dev->release_number, cur_dev->serial_number);
+        dev_flashSize = spi_readFlashSize();
+        dev_slots = dev_flashSize/SLOTSIZE;
+        wprintf(L"Opened %s (%04X:%04X:%04X:%s:%dM)\n", cur_dev->product_string, cur_dev->vendor_id, cur_dev->product_id, cur_dev->release_number, cur_dev->serial_number, dev_flashSize/0x20000);
+        if(!dev_flashSize) {
+            printf("Flash read failed.\n");
+            dev_close();
+        }
     } else {
         printf("Device not found.\n");
     }
@@ -43,6 +49,8 @@ bool dev_open() {
 }
 
 void dev_close() {
+    dev_flashSize=0;
+    dev_slots=0;
     if(handle) {
         hid_close(handle);
     }

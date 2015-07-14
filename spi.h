@@ -1,7 +1,11 @@
 #pragma once
 
+enum { 
+    SLOTSIZE=0x10000,
+};
+
 uint32_t spi_readID();
-uint32_t spi_flashSize();
+uint32_t spi_readFlashSize();
 bool spi_dumpFlash(char *filename, int addr, int size);
 bool spi_writeFile(char *filename, uint32_t addr);
 bool spi_writeFlash(uint8_t *buf, uint32_t addr, uint32_t size);
