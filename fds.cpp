@@ -27,7 +27,7 @@ enum {
 };
 
 
-void raw03_to_bin(uint8_t *raw, int rawSize, uint8_t **_bin, int *_binSize);
+static void raw03_to_bin(uint8_t *raw, int rawSize, uint8_t **_bin, int *_binSize);
 
 
 //don't include gap end
@@ -234,7 +234,6 @@ bool FDS_readDisk(char *filename_raw, char *filename_bin, char *filename_fds) {
     uint8_t *readBuf=NULL;
     int result;
     int bytesIn=0;
-    uint8_t sequence=1;
 
     //if(!(dev_readIO()&MEDIA_SET)) {
     //    printf("Warning - Disk not inserted?\n");
