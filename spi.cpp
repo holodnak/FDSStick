@@ -124,7 +124,7 @@ static bool unWriteProtect() {
 }
 
 //write single page
-static bool pageWrite(uint32_t addr, uint8_t *buf, int size) {
+static bool pageWrite(uint32_t addr, const uint8_t *buf, int size) {
     uint8_t cmd[PAGESIZE+4];
     if(((addr&(PAGESIZE-1))+size)>PAGESIZE)
         { printf("Page write overflow.\n"); return false; }
@@ -146,7 +146,7 @@ static bool pageWrite(uint32_t addr, uint8_t *buf, int size) {
     return writeWait(50);
 }
 
-bool spi_writeFlash(uint8_t *buf, uint32_t addr, uint32_t size) {
+bool spi_writeFlash(const uint8_t *buf, uint32_t addr, uint32_t size) {
     uint32_t wrote, pageWriteSize;
     bool ok=false;
     do {

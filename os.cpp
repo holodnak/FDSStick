@@ -19,6 +19,10 @@
         return _getch();
     }
 
+    void sleep_ms(int millisecs) {
+        Sleep(millisecs);
+    }
+
 #elif defined(__linux__) || defined(__APPLE__)
 
     #include <sys/time.h>
@@ -54,6 +58,10 @@
         ch = getchar();
         tcsetattr( STDIN_FILENO, TCSANOW, &oldt );
         return ch;
+    }
+
+    void sleep_ms(int millisecs) {
+        usleep(millisecs*1000);
     }
 
 #endif

@@ -12,6 +12,7 @@
 
 int dev_flashSize;
 int dev_slots;
+uint8_t dev_fwVersion;
 
 static hid_device *handle=NULL;
 static uint8_t hidbuf[256];
@@ -19,21 +20,19 @@ static uint8_t hidbuf[256];
 
 bool dev_open() {
     struct hid_device_info *devs, *cur_dev;
-    const char *path_to_open = NULL;
 
     dev_close();
     devs = hid_enumerate(VID, PID);
     cur_dev = devs;
     while (cur_dev) {
-        if(cur_dev->vendor_id==VID && cur_dev->product_id==PID && cur_dev->product_string && wcscmp(DEV_NAME, cur_dev->product_string)==0) {
-            path_to_open = cur_dev->path;
+        if(cur_dev->vendor_id==VID && cur_dev->product_id==PID && cur_dev->product_string && wcscmp(DEV_NAME, cur_dev->product_string)==0)
             break;
-        }
         cur_dev = cur_dev->next;
     }
     if(cur_dev)
         handle = hid_open_path(cur_dev->path);
     if(handle) {
+        dev_fwVersion = cur_dev->release_number&0xff;
         dev_flashSize = spi_readFlashSize();
         dev_slots = dev_flashSize/SLOTSIZE;
         wprintf(L"Opened %s (%04X:%04X:%04X:%s:%dM)\n", cur_dev->product_string, cur_dev->vendor_id, cur_dev->product_id, cur_dev->release_number, cur_dev->serial_number, dev_flashSize/0x20000);
@@ -78,6 +77,11 @@ bool dev_updateFirmware() {
     hidbuf[0]=ID_UPDATEFIRMWARE;
     hid_send_feature_report(handle, hidbuf, 2);    //reset after update will cause an error, ignore it
     return true;
+}
+
+void dev_selfTest() {
+    hidbuf[0]=ID_SELFTEST;
+    hid_send_feature_report(handle, hidbuf, 2);
 }
 
 bool dev_spiRead(uint8_t *buf, int size, bool holdCS) {

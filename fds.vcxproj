@@ -13,6 +13,7 @@
   <ItemGroup>
     <ClCompile Include="device.cpp" />
     <ClCompile Include="fds.cpp" />
+    <ClCompile Include="firmware.cpp" />
     <ClCompile Include="hidapi\hid-windows.c" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="os.cpp" />
@@ -21,6 +22,7 @@
   <ItemGroup>
     <ClInclude Include="device.h" />
     <ClInclude Include="fds.h" />
+    <ClInclude Include="firmware.h" />
     <ClInclude Include="os.h" />
     <ClInclude Include="spi.h" />
   </ItemGroup>

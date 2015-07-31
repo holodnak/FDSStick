@@ -5,6 +5,7 @@
 #include "device.h"
 #include "spi.h"
 #include "fds.h"
+#include "firmware.h"
         
 void app_exit(int exitcode) {
     dev_close();
@@ -21,7 +22,6 @@ void help() {
         "    -w file.fds                 write disk\n"
         "    -l                          list flash contents\n"
         "    -e [1..8 | all]             erase flash\n"
-        "    -u file.fw                  update firmware\n"
         //"    -D file [addr] [size]       dump flash\n"
         //"    -W file [addr]              write flash\n"
     );
@@ -35,18 +35,12 @@ int main(int argc, char** argv) {
     if(!dev_open() || argc<2 || argv[1][0]!='-') {
         help();
     }
-
+/*
+    if(!firmware_update())  //auto-update old firmware
+        app_exit(1);
+*/
     bool success=false;
     switch(argv[1][1]) {
-
-    case 'u': //update -u filename
-        if(argc<3)
-            help();
-        {
-            if(spi_writeFile(argv[2], 0xff0000))
-                success=dev_updateFirmware();
-            break;
-        }
 
     case 'f': //flash -f file.fds [slot]
         if(argc<3)
@@ -134,13 +128,22 @@ int main(int argc, char** argv) {
             break;
         }
 
-    case 't':   //test ...
+    case 'u': //update -u filename
         if(argc<3)
             help();
         {
-            FDS_rawToBin(argv[2], argc>3? argv[3]: NULL);
+            if(spi_writeFile(argv[2], 0xff0000))
+                success=dev_updateFirmware();
             break;
         }
+
+    case 'T':   //mfgTest -T ...
+        {
+            dev_selfTest();
+            success=true;
+            break;
+        }
+
 */
     default:
         help();

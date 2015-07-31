@@ -6,7 +6,7 @@ CXX      ?= g++
 CFLAGS   ?= -Wall -g -c
 
 TARGET    = fds
-CPPOBJS   = main.o spi.o fds.o device.o os.o
+CPPOBJS   = main.o spi.o fds.o device.o os.o firmware.o
 ifeq ($(UNAME),Darwin)
  COBJS    = hidapi/hid-mac.o
  LIBS     = -framework IOKit -framework CoreFoundation -liconv
