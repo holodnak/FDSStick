@@ -13,7 +13,7 @@ ifeq ($(UNAME),Darwin)
 endif
 ifeq ($(UNAME),Linux)
  COBJS    = hidapi/hid-linux.o
- LIBS      = `pkg-config libusb-1.0 --libs`
+ LIBS      = `pkg-config libusb-1.0 --libs` -l pthread
  INCLUDES ?= `pkg-config libusb-1.0 --cflags`
 endif
 OBJS      = $(COBJS) $(CPPOBJS)
