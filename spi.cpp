@@ -13,27 +13,38 @@ enum {
     CMD_READID=0x9f,
     CMD_READDATA=0x03,
     CMD_WRITESTATUS=0x01,
-    CMD_PAGEWRITE=0x0a,
-    CMD_PAGEERASE=0xdb,
+	CMD_PAGEWRITE = 0x0a,
+	CMD_PAGEERASE = 0xdb,
+	CMD_PAGEPROGRAM = 0x02,
+	CMD_BLOCKERASE = 0xd8,
 };
 
 uint32_t spi_readID() {
     static uint8_t readID[]={CMD_READID};
     uint32_t id=0;
-    if(!dev_spiWrite(readID, 1, 1, 1))
-        return 0;
-    if(!dev_spiRead((uint8_t*)&id, 3, 0))
-        return 0;
+	 if (!dev_spiWrite(readID, 1, 1, 1)) {
+		 printf("spi_readID: dev_spiWrite failed\n");
+		 return 0;
+	 }
+	 if (!dev_spiRead((uint8_t*)&id, 3, 0)) {
+		 printf("spi_readID: dev_spiRead failed\n");
+		 return 0;
+	 }
     return id;
 }
 
 uint32_t spi_readFlashSize() {
-    uint32_t id=spi_readID();
-    switch(id) {
-        case 0x138020: // ST25PE40, M25PE40: 4Mbit (512kB)
-            return 0x80000;
-    }
-    return 0;
+	uint32_t id=spi_readID();
+	printf("flash size id = %X\n", id);
+	switch(id) {
+		case 0x138020: // ST25PE40, M25PE40: 4Mbit (512kB)
+			return 0x80000;
+		case 0x1440EF: // W25Q80DV (1mB)
+			return 0x100000;
+		case 0x174001: // S25FL164K (8mB)
+			return 0x800000;
+	}
+	return 0;
 }
 
 bool spi_readFlash(int addr, uint8_t *buf, int size) {
@@ -79,13 +90,18 @@ bool spi_dumpFlash(char *filename, int addr, int size) {
 
 static bool readStatus(uint8_t *status) {
     static uint8_t cmd[]={CMD_READSTATUS};
+	 bool ret;
+
     if(!dev_spiWrite(cmd,1,1,1))
         return false;
-    return dev_spiRead(status,1,0);
+    ret = dev_spiRead(status,1,0);
+	 printf("readStatus:  status = %X\n", *status);
+	 return ret;
 }
 
 static bool writeEnable() {
     static uint8_t cmd[]={CMD_WRITEENABLE};
+//	 printf("enabling writes.\n");
     return dev_spiWrite(cmd,1,1,0);
 }
 
@@ -111,54 +127,105 @@ static bool writeWait(uint32_t timeout_ms) {
 static bool unWriteProtect() {
     static uint8_t cmd[]={CMD_WRITESTATUS,0};
 
-    uint8_t status;
+/*    uint8_t status;
     if(!readStatus(&status))
         return false;
-    if(!(status & 0x1c))    //already unlocked
-        return true;
-    if(!writeEnable())
-        return false;
-    if(!dev_spiWrite(cmd,2,1,0))
+	 if (!(status & 0x1c)) {    //already unlocked
+		 printf("unWriteProtect: already unlocked\n");
+		 return true;
+	 }*/
+	 if (!writeEnable()) {
+		 printf("write enable failed.\n");
+		 return false;
+	 }
+	 printf("write enable ok.\n");
+	 if(!dev_spiWrite(cmd,2,1,0))
         return false;
     return writeWait(50);
 }
 
 //write single page
 static bool pageWrite(uint32_t addr, const uint8_t *buf, int size) {
-    uint8_t cmd[PAGESIZE+4];
-    if(((addr&(PAGESIZE-1))+size)>PAGESIZE)
-        { printf("Page write overflow.\n"); return false; }
-    if(!writeEnable())
-        return false;
-    cmd[0]=CMD_PAGEWRITE;
-    cmd[1]=addr>>16;
-    cmd[2]=addr>>8;
-    cmd[3]=addr;
-    memcpy(cmd+4, buf, size);
-    size+=4;
+	uint8_t cmd[PAGESIZE + 4];
+	if (((addr&(PAGESIZE - 1)) + size)>PAGESIZE)
+	{
+		printf("Page write overflow.\n"); return false;
+	}
+	if (!writeEnable())
+		return false;
+	cmd[0] = CMD_PAGEWRITE;
+	cmd[1] = addr >> 16;
+	cmd[2] = addr >> 8;
+	cmd[3] = addr;
+	memcpy(cmd + 4, buf, size);
+	size += 4;
 
-    uint8_t *p=cmd;
-    for(;size>0;size-=SPI_WRITEMAX) {
-        if(!dev_spiWrite(p, size>SPI_WRITEMAX? SPI_WRITEMAX: size, p==cmd, size>SPI_WRITEMAX))
-            return false;
-        p+=SPI_WRITEMAX;
-    }
-    return writeWait(50);
+	uint8_t *p = cmd;
+	for (; size>0; size -= SPI_WRITEMAX) {
+		if (!dev_spiWrite(p, size>SPI_WRITEMAX ? SPI_WRITEMAX : size, p == cmd, size>SPI_WRITEMAX))
+			return false;
+		p += SPI_WRITEMAX;
+	}
+	return writeWait(50);
+}
+
+static bool blockErase(uint32_t addr)
+{
+	uint8_t cmd[] = { CMD_BLOCKERASE,0,0,0 };
+	if (!writeEnable())
+		return false;
+	cmd[1] = addr >> 16;
+	if (!dev_spiWrite(cmd, 4, 1, 0))
+		return false;
+	return writeWait(2000);
+}
+
+static bool pageProgram(uint32_t addr, const uint8_t *buf, int size) {
+	uint8_t cmd[PAGESIZE + 4];
+	if (((addr&(PAGESIZE - 1)) + size)>PAGESIZE)
+	{
+		printf("Page write overflow.\n"); return false;
+	}
+	if (!writeEnable())
+		return false;
+	cmd[0] = CMD_PAGEPROGRAM;
+	cmd[1] = addr >> 16;
+	cmd[2] = addr >> 8;
+	cmd[3] = addr;
+	memcpy(cmd + 4, buf, size);
+	size += 4;
+
+	uint8_t *p = cmd;
+	for (; size>0; size -= SPI_WRITEMAX) {
+		if (!dev_spiWrite(p, size>SPI_WRITEMAX ? SPI_WRITEMAX : size, p == cmd, size>SPI_WRITEMAX))
+			return false;
+		p += SPI_WRITEMAX;
+	}
+	return writeWait(50);
 }
 
 bool spi_writeFlash(const uint8_t *buf, uint32_t addr, uint32_t size) {
     uint32_t wrote, pageWriteSize;
     bool ok=false;
     do {
-        if(!unWriteProtect())
+		 if (blockErase(addr) == 0) {
+			 printf("spi_WriteFlash: blockErase failed\n");
+			 break;
+		 }
+		 if(!unWriteProtect())
             { printf("Write protected.\n"); break; }
+//		  return(false);
         for(wrote=0; wrote<size; wrote+=pageWriteSize) {
             pageWriteSize=PAGESIZE-(addr & (PAGESIZE-1));   //bytes left in page
             if(pageWriteSize>size-wrote)
                 pageWriteSize=size-wrote;
-            if(!pageWrite(addr+wrote, buf+wrote, pageWriteSize))
-                break;
-            if((addr+wrote)%0x800==0)
+				if (pageProgram(addr + wrote, buf + wrote, pageWriteSize) == 0) {
+					printf("spi_WriteFlash: pageErase failed\n");
+					break;
+				}
+				//				if (!pageWrite(addr + wrote, buf + wrote, pageWriteSize))
+//					break;
+				if((addr+wrote)%0x800==0)
                 printf(".");
         }
         printf("\n");
@@ -192,11 +259,11 @@ bool spi_erasePage(int addr) {
         { printf("Write protected.\n"); return false; }
     if(!writeEnable())
         return false;
-    cmd[0]=CMD_PAGEERASE;
+    cmd[0]=CMD_BLOCKERASE;
     cmd[1]=addr>>16;
-    cmd[2]=addr>>8;
-    cmd[3]=addr;
+    cmd[2]=0;
+    cmd[3]=0;
     if(!dev_spiWrite(cmd, 4, 1, 0))
         return false;
-    return writeWait(50);
+    return writeWait(2000);
 }

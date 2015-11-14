@@ -79,7 +79,7 @@ void copy_block(uint8_t *dst, uint8_t *src, int size) {
 //Adds GAP + GAP end (0x80) + CRCs to .FDS image
 //Returns size (0=error)
 int fds_to_bin(uint8_t *dst, uint8_t *src, int dstSize) {
-    int i=0, o=0;
+	int i=0, o=0;
 
     //check *NINTENDO-HVC* header
     if(src[0]!=0x01 || src[1]!=0x2a || src[2]!=0x4e) {
@@ -233,8 +233,8 @@ bool block_decode(uint8_t *dst, uint8_t *src, int *inP, int *outP, int srcSize, 
         }
         in++;
     } while(out<outEnd);
-    if(dst[*outP]!=blockType) {
-        printf("Wrong block type %X(%X)-%X(%X)\n", start, *outP, in, out-1);
+    if(dst[*outP] !=blockType) {
+        printf("Wrong block type %X(%X)-%X(%X) (found %d, expected %d)\n", start, *outP, in, out-1, dst[*outP], blockType);
         return false;
     }
     out=out/8-2;
@@ -407,51 +407,53 @@ static bool writeDisk(uint8_t *bin, int binSize) {
 }
 
 bool FDS_writeDisk(char *filename) {
-    enum {
-        LEAD_IN = DEFAULT_LEAD_IN/8,
-        DISKSIZE=0x11000,               //whole disk contents including lead-in
-    };
+	enum {
+		LEAD_IN = DEFAULT_LEAD_IN / 8,
+		DISKSIZE = 0x11000,               //whole disk contents including lead-in
+	};
 
-    uint8_t *inbuf=0;       //.FDS buffer
-    uint8_t *bin=0;         //.FDS with gaps/CRC
-    int filesize;
-    int binSize;
+	uint8_t *inbuf = 0;       //.FDS buffer
+	uint8_t *bin = 0;         //.FDS with gaps/CRC
+	int filesize;
+	int binSize;
 
-    if(!loadFile(filename, &inbuf, &filesize))
-        { printf("Can't read %s\n",filename); return false; }
+	if (!loadFile(filename, &inbuf, &filesize))
+	{
+		printf("Can't read %s\n", filename); return false;
+	}
 
-    bin=(uint8_t*)malloc(DISKSIZE);
+	bin = (uint8_t*)malloc(DISKSIZE);
 
-    int inpos=0, side=0;
-    if(inbuf[0]=='F')
-        inpos=16;      //skip fwNES header
+	int inpos = 0, side = 0;
+	if (inbuf[0] == 'F')
+		inpos = 16;      //skip fwNES header
 
-    filesize -= (filesize-inpos)%FDSSIZE;  //truncate down to whole disk
+	filesize -= (filesize - inpos) % FDSSIZE;  //truncate down to whole disk
 
-    char prompt;
-    do {
-        printf("Side %d\n", side+1);
+	char prompt;
+	do {
+		printf("Side %d\n", side + 1);
 
-        memset(bin,0,LEAD_IN);
-        binSize=fds_to_bin(bin+LEAD_IN, inbuf+inpos, DISKSIZE-LEAD_IN);
-        if(!binSize)
-            break;
-        if(!writeDisk(bin, binSize+LEAD_IN))
-            break;
-        inpos+=FDSSIZE;
-        side++;
+		memset(bin, 0, LEAD_IN);
+		binSize = fds_to_bin(bin + LEAD_IN, inbuf + inpos, DISKSIZE - LEAD_IN);
+		if (!binSize)
+			break;
+		if (!writeDisk(bin, binSize + LEAD_IN))
+			break;
+		inpos += FDSSIZE;
+		side++;
 
-        //prompt for disk change
-        prompt=0;
-        if(inpos<filesize && inbuf[inpos]==0x01) {
-            printf("Push ENTER for next disk side\n");
-            prompt=readKb();
-        }
-    } while(prompt==0x0d);
+		//prompt for disk change
+		prompt = 0;
+		if (inpos<filesize && inbuf[inpos] == 0x01) {
+			printf("Push ENTER for next disk side\n");
+			prompt = readKb();
+		}
+	} while (prompt == 0x0d);
 
-    free(bin);
-    free(inbuf);
-    return true;
+	free(bin);
+	free(inbuf);
+	return true;
 }
 
 //slot 1..n
@@ -477,8 +479,8 @@ bool FDS_writeFlash(char *filename, int slot) {
         printf("Side %d\n", side+1);
         if(fds_to_bin(outbuf+FLASHHEADERSIZE, inbuf+pos, SLOTSIZE-FLASHHEADERSIZE)) {
             memset(outbuf,0,FLASHHEADERSIZE);
-            outbuf[0xfe]=DEFAULT_LEAD_IN & 0xff;
-            outbuf[0xff]=DEFAULT_LEAD_IN / 256;
+            outbuf[243]=DEFAULT_LEAD_IN & 0xff;
+            outbuf[244]=DEFAULT_LEAD_IN / 256;
             if(side==0) {
                 //strip path from filename
                 char *shortName=strrchr(filename,'/');      // ...dir/file.fds
@@ -492,8 +494,9 @@ bool FDS_writeFlash(char *filename, int slot) {
                     shortName=filename;
                 else
                     shortName++;
-                utf8_to_utf16((uint16_t*)outbuf, shortName, FILENAMELENGTH*2);
-                ((uint16_t*)outbuf)[FILENAMELENGTH-1]=0;
+//                utf8_to_utf16((uint16_t*)outbuf, shortName, FILENAMELENGTH*2);
+//                ((uint16_t*)outbuf)[FILENAMELENGTH-1]=0;
+					 strncpy((char*)outbuf, shortName, 240);
             }
             spi_writeFlash(outbuf, (slot+side-1)*SLOTSIZE, SLOTSIZE);
         }
@@ -503,6 +506,49 @@ bool FDS_writeFlash(char *filename, int slot) {
     free(inbuf);
     free(outbuf);
     return true;
+}
+
+void hexdump(char *desc, void *addr, int len)
+{
+	int i;
+	unsigned char buff[17];
+	unsigned char *pc = (unsigned char *)addr;
+
+	// Output description if given.
+	if (desc != NULL)
+		printf("%s:\r\n", desc);
+
+	// Process every byte in the data.
+	for (i = 0; i < len; i++) {
+		// Multiple of 16 means new line (with line offset).
+
+		if ((i % 16) == 0) {
+			// Just don't print ASCII for the zeroth line.
+			if (i != 0)
+				printf("  %s\r\n", buff);
+
+			// Output the offset.
+			printf("  %04x ", i);
+		}
+		// Now the hex code for the specific character.
+		printf(" %02x", pc[i]);
+
+		// And store a printable ASCII character for later.
+		if ((pc[i] < 0x20) || (pc[i] > 0x7e))
+			buff[i % 16] = '.';
+		else
+			buff[i % 16] = pc[i];
+		buff[(i % 16) + 1] = '\0';
+	}
+
+	// Pad out last line if not exactly 16 characters.
+	while ((i % 16) != 0) {
+		printf("   ");
+		i++;
+	}
+
+	// And print the final ASCII bit.
+	printf("  %s\r\n", buff);
 }
 
 bool FDS_list() {
@@ -516,7 +562,7 @@ bool FDS_list() {
             printf("%d:\n",slot);
             side=0;
         } else if(buf[0]!=0) {      //filename present
-            wprintf(L"%d: %s\n", slot, buf);
+            printf("%d: %s\n", slot, buf);
             side=1;
         } else if(!side) {          //first side is missing
             printf("%d: ?\n", slot);
@@ -837,21 +883,28 @@ bool FDS_rawToBin(char *filename_raw, char *filename_bin) {
 //make raw0-3 from flash image (sans header)
 static void bin_to_raw03(uint8_t *bin, uint8_t *raw, int binSize, int rawSize) {
     int in, out;
-    uint8_t bit;
+    uint8_t bit, data;
 
     memset(raw,0xff,rawSize);
     for(bit=1, out=0, in=0; in<binSize*8; in++) {
-        bit = (bit<<7) | (1 & (bin[in/8]>>(in%8)));   //LSB first
+		 if ((in & 7) == 0) {
+			 data = *bin;
+			 bin++;
+		 }
+		 bit = (bit << 7) | (1 & (data >> (in & 7)));   //LSB first
+//     bit = (bit<<7) | (1 & (bin[in/8]>>(in%8)));   //LSB first
         switch(bit) {
             case 0x00:  //10 10
-                raw[++out]++;
+					 out++;
+                raw[out]++;
                 break;
             case 0x01:  //10 01
             case 0x81:  //01 01
-                ++raw[out++];
+                raw[out]++;
+					 out++;
                 break;
             case 0x80:  //01 10
-                raw[out]+=2;
+                raw[out] += 2;
                 break;
         }
     }
@@ -862,8 +915,8 @@ static void bin_to_raw03(uint8_t *bin, uint8_t *raw, int binSize, int rawSize) {
 //Just convert to raw and use disk dumping functions.
 bool FDS_readFlashToFDS(char *filename_fds, int slot) {  //slot 1..N
     enum {
-        RAWSIZE = SLOTSIZE*8,
-    };
+		 RAWSIZE = SLOTSIZE * 8,
+	 };
 
     static uint8_t fwnesHdr[16]={0x46, 0x44, 0x53, 0x1a, };
 
@@ -882,8 +935,8 @@ bool FDS_readFlashToFDS(char *filename_fds, int slot) {  //slot 1..N
     fwrite(fwnesHdr,1,sizeof(fwnesHdr),f);
 
     bin=(uint8_t*)malloc(SLOTSIZE);     //single side from flash
-    raw=(uint8_t*)malloc(RAWSIZE);      //..to raw03
-    fds=(uint8_t*)malloc(FDSSIZE);      //..to FDS
+	 raw=(uint8_t*)malloc(RAWSIZE);      //..to raw03
+	 fds=(uint8_t*)malloc(FDSSIZE);      //..to FDS
 
     int side=0;
     for(; side+slot<=dev_slots; side++) {
@@ -900,8 +953,8 @@ bool FDS_readFlashToFDS(char *filename_fds, int slot) {  //slot 1..N
 
         printf("Side %d\n",side+1);
         memset(bin,0,FLASHHEADERSIZE);  //clear header, use it as lead-in
-        bin_to_raw03(bin, raw, SLOTSIZE, RAWSIZE);
-        if(!raw03_to_fds(raw, fds, RAWSIZE)) {
+		  bin_to_raw03(bin, raw, SLOTSIZE, RAWSIZE);
+		  if(!raw03_to_fds(raw, fds, RAWSIZE)) {
             result=false;
             break;
         }
@@ -917,4 +970,130 @@ bool FDS_readFlashToFDS(char *filename_fds, int slot) {  //slot 1..N
     free(bin);
     fclose(f);
     return result;
+}
+
+int writeBin(char *fn, uint8_t *bin, int binsize)
+{
+	FILE *fp;
+
+	if ((fp = fopen(fn, "wb")) == 0) {
+		printf("error opening '%s'\n", fn);
+		return(0);
+	}
+
+	fwrite(bin, binsize, 1, fp);
+
+	fclose(fp);
+	return(1);
+}
+
+bool FDS_convertDiskraw03(char *filename, char *out) {
+	enum {
+		LEAD_IN = DEFAULT_LEAD_IN / 8,
+		DISKSIZE = 0x11000,               //whole disk contents including lead-in
+		RAWSIZE = SLOTSIZE * 8,
+	};
+
+	uint8_t *inbuf = 0;       //.FDS buffer
+	uint8_t *bin = 0;         //.FDS with gaps/CRC
+	uint8_t *raw = 0;         //.FDS with gaps/CRC
+	int filesize;
+	int binSize;
+
+	if (!loadFile(filename, &inbuf, &filesize))
+	{
+		printf("Can't read %s\n", filename); return false;
+	}
+
+	bin = (uint8_t*)malloc(DISKSIZE);
+	raw = (uint8_t*)malloc(RAWSIZE);      //..to raw03
+
+
+	int inpos = 0, side = 0;
+	if (inbuf[0] == 'F')
+		inpos = 16;      //skip fwNES header
+
+	filesize -= (filesize - inpos) % FDSSIZE;  //truncate down to whole disk
+
+	char prompt;
+	do {
+		printf("Side %d\n", side + 1);
+
+		memset(bin, 0, LEAD_IN);
+		binSize = fds_to_bin(bin + LEAD_IN, inbuf + inpos, DISKSIZE - LEAD_IN);
+		if (!binSize)
+			break;
+		printf("writing output\n");
+		bin_to_raw03(bin, raw, SLOTSIZE, RAWSIZE);
+		if (!writeBin(out, raw, RAWSIZE))
+			break;
+		inpos += FDSSIZE;
+		side++;
+
+		//prompt for disk change
+		prompt = 0;
+		if (inpos<filesize && inbuf[inpos] == 0x01) {
+			printf("Push ENTER for next disk side\n");
+			prompt = readKb();
+		}
+	} while (prompt == 0x0d);
+
+	printf("done\n");
+
+	free(bin);
+	free(inbuf);
+	return true;
+}
+
+bool FDS_convertDisk(char *filename, char *out) {
+	enum {
+		LEAD_IN = DEFAULT_LEAD_IN / 8,
+		DISKSIZE = 0x11000,               //whole disk contents including lead-in
+	};
+
+	uint8_t *inbuf = 0;       //.FDS buffer
+	uint8_t *bin = 0;         //.FDS with gaps/CRC
+	int filesize;
+	int binSize;
+
+	if (!loadFile(filename, &inbuf, &filesize))
+	{
+		printf("Can't read %s\n", filename); return false;
+	}
+
+	bin = (uint8_t*)malloc(DISKSIZE);
+
+	int inpos = 0, side = 0;
+	if (inbuf[0] == 'F')
+		inpos = 16;      //skip fwNES header
+
+	filesize -= (filesize - inpos) % FDSSIZE;  //truncate down to whole disk
+
+	char prompt;
+	do {
+		printf("Side %d\n", side + 1);
+
+		memset(bin, 0, LEAD_IN);
+		binSize = fds_to_bin(bin + LEAD_IN, inbuf + inpos, DISKSIZE - LEAD_IN);
+		if (!binSize)
+			break;
+		printf("writing output\n");
+		if (!writeBin(out, bin, binSize + LEAD_IN))
+			break;
+		inpos += FDSSIZE;
+		side++;
+
+		//prompt for disk change
+		prompt = 0;
+		if (inpos<filesize && inbuf[inpos] == 0x01) {
+			printf("Push ENTER for next disk side\n");
+			prompt = readKb();
+		}
+	} while (prompt == 0x0d);
+
+	printf("done\n");
+
+	free(bin);
+	free(inbuf);
+	return true;
 }

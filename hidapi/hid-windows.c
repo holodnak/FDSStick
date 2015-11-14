@@ -225,8 +225,8 @@ static HANDLE open_device(const char *path, BOOL enumerate)
     HANDLE handle;
     DWORD desired_access = (enumerate)? 0: (GENERIC_WRITE | GENERIC_READ);
     DWORD share_mode = (enumerate)?
-                          FILE_SHARE_READ|FILE_SHARE_WRITE:
-                          FILE_SHARE_READ;
+                          FILE_SHARE_READ | FILE_SHARE_WRITE :
+                          FILE_SHARE_READ | FILE_SHARE_WRITE;
 
     handle = CreateFileA(path,
         desired_access,
@@ -595,7 +595,12 @@ HID_API_EXPORT hid_device * HID_API_CALL hid_open_path(const char *path)
 
 err_pp_data:
         HidD_FreePreparsedData(pp_data);
-err:	
+	  err:	
+		  {
+			  char name[256];
+			  wcstombs(name, hid_error(dev), 256);
+			  printf("hidapi error: %s\n", name);
+		  }
         free_hid_device(dev);
         return NULL;
 }
@@ -728,6 +733,7 @@ int HID_API_EXPORT HID_API_CALL hid_set_nonblocking(hid_device *dev, int nonbloc
 
 int HID_API_EXPORT HID_API_CALL hid_send_feature_report(hid_device *dev, const unsigned char *data, size_t length)
 {
+//	printf("feature report len = %d\n", dev->feature_report_length);
     BOOL res = HidD_SetFeature(dev->device_handle, (PVOID)data, dev->feature_report_length);
     if (!res) {
         register_error(dev, "HidD_SetFeature");
@@ -843,7 +849,8 @@ int HID_API_EXPORT_CALL HID_API_CALL hid_get_indexed_string(hid_device *dev, int
 
 HID_API_EXPORT const wchar_t * HID_API_CALL  hid_error(hid_device *dev)
 {
-    return (wchar_t*)dev->last_error_str;
+
+    return dev ? (wchar_t*)dev->last_error_str : L"error";
 }
 
 

@@ -6,9 +6,16 @@
 #include "device.h"
 #include "spi.h"
 
-#define VID 0x16d0
-#define PID 0x0aaa
-#define DEV_NAME L"FDSStick"
+
+//#define VID 0x16d0
+//#define PID 0x0aaa
+//#define DEV_NAME L"FDSStick"
+
+#define VID 0x0416
+#define PID 0xBEEF
+#define DEV_NAME L"FDSdick"
+
+
 
 int dev_flashSize;
 int dev_slots;
@@ -20,17 +27,22 @@ static uint8_t hidbuf[256];
 
 bool dev_open() {
     struct hid_device_info *devs, *cur_dev;
+	 char name[256];
 
     dev_close();
     devs = hid_enumerate(VID, PID);
     cur_dev = devs;
     while (cur_dev) {
-        if(cur_dev->vendor_id==VID && cur_dev->product_id==PID && cur_dev->product_string && wcscmp(DEV_NAME, cur_dev->product_string)==0)
-            break;
+//		 if (cur_dev->vendor_id == VID && cur_dev->product_id == PID && cur_dev->product_string && wcscmp(DEV_NAME, cur_dev->product_string) == 0)
+		 if (cur_dev->vendor_id == VID && cur_dev->product_id == PID)
+				 break;
         cur_dev = cur_dev->next;
     }
-    if(cur_dev)
-        handle = hid_open_path(cur_dev->path);
+	 if (cur_dev) {
+		 wcstombs(name, cur_dev->product_string, 256);
+//		 printf("opening device '%s':  %s\n", name,cur_dev->path);
+		 handle = hid_open_path(cur_dev->path);
+	 }
     if(handle) {
         dev_fwVersion = cur_dev->release_number&0xff;
         dev_flashSize = spi_readFlashSize();
@@ -41,19 +53,20 @@ bool dev_open() {
             dev_close();
         }
     } else {
-        printf("Device not found.\n");
-    }
+//		 wcstombs(name, hid_error(cur_dev), 256);
+		 printf("Device not found\n");
+	 }
     hid_free_enumeration(devs);
     return !!handle;
 }
 
 void dev_close() {
-    dev_flashSize=0;
-    dev_slots=0;
-    if(handle) {
-        hid_close(handle);
-    }
-    handle=NULL;
+	dev_flashSize = 0;
+	dev_slots = 0;
+	if (handle) {
+		hid_close(handle);
+	}
+	handle = NULL;
 }
 
 void dev_printLastError() {
@@ -85,16 +98,22 @@ void dev_selfTest() {
 }
 
 bool dev_spiRead(uint8_t *buf, int size, bool holdCS) {
+	int ret;
+
     if(size>SPI_READMAX)
         { printf("Read too big.\n"); return false; }
     hidbuf[0]=holdCS? ID_SPI_READ: ID_SPI_READ_STOP;
-    if(hid_get_feature_report(handle, hidbuf, 64) < 0)
+	 ret = hid_get_feature_report(handle, hidbuf, 64);
+//	 printf("hid_get_feature_report returned %d\n", ret);
+    if(ret < 0)
         return false;
     memcpy(buf, hidbuf+1, size);
     return true;
 }
 
 bool dev_spiWrite(uint8_t *buf, int size, bool initCS, bool holdCS) {
+	int ret;
+
     if(size>SPI_WRITEMAX)
         { printf("Write too big.\n"); return false; }
     hidbuf[0]=ID_SPI_WRITE;
@@ -103,7 +122,9 @@ bool dev_spiWrite(uint8_t *buf, int size, bool initCS, bool holdCS) {
     hidbuf[3]=holdCS;
     if(size)
         memcpy(hidbuf+4, buf, size);
-    return hid_send_feature_report(handle, hidbuf, 4+size) >= 0;
+	 ret = hid_send_feature_report(handle, hidbuf, 4 + size);
+//	 printf("hid_send_feature_report returned %d\n", ret);
+    return ret >= 0;
 }
 
 //---------

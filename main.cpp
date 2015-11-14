@@ -9,6 +9,7 @@
         
 void app_exit(int exitcode) {
     dev_close();
+//	 system("pause");
     exit(exitcode);
 };
 
@@ -22,9 +23,11 @@ void help() {
         "    -w file.fds                 write disk\n"
         "    -l                          list flash contents\n"
         "    -e [1..8 | all]             erase flash\n"
-        //"    -D file [addr] [size]       dump flash\n"
-        //"    -W file [addr]              write flash\n"
-    );
+        "    -D file [addr] [size]       dump flash\n"
+        "    -W file [addr]              write flash\n"
+		 "    -c file.fds file.bin        convert fds format to bin format\n"
+		 "    -C file.fds file.raw        convert fds format to raw03 format\n"
+		 );
     app_exit(1);
 }
 
@@ -42,6 +45,15 @@ int main(int argc, char** argv) {
     bool success=false;
     switch(argv[1][1]) {
 
+	 case 'c': //convert file.fds file.bin
+		 FDS_convertDisk(argv[2], argv[3]);
+		 break;
+
+	 case 'C': //convert file.fds file.bin
+		 FDS_convertDiskraw03(argv[2], argv[3]);
+		 break;
+
+
     case 'f': //flash -f file.fds [slot]
         if(argc<3)
             help();
@@ -51,6 +63,7 @@ int main(int argc, char** argv) {
                 sscanf(argv[3],"%i",&slot);
             success=FDS_writeFlash(argv[2], slot);
         }
+		  app_exit(0);
         break;
 
     case 's': //save -s file.fds [slot]
@@ -103,7 +116,7 @@ int main(int argc, char** argv) {
             }
         }
         break;
-/*
+
     case 'D':   //dump -D filename addr size
         if(argc<3)
             help();
@@ -128,15 +141,15 @@ int main(int argc, char** argv) {
             break;
         }
 
-    case 'u': //update -u filename
-        if(argc<3)
+/*	case 'u': //update -u filename
+		  if(argc<3)
             help();
         {
             if(spi_writeFile(argv[2], 0xff0000))
                 success=dev_updateFirmware();
             break;
         }
-
+		  */
     case 'T':   //mfgTest -T ...
         {
             dev_selfTest();
@@ -144,7 +157,7 @@ int main(int argc, char** argv) {
             break;
         }
 
-*/
+
     default:
         help();
     }

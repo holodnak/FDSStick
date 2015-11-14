@@ -7,3 +7,7 @@ bool FDS_writeFlash(char *name, int slot);
 bool FDS_list();
 bool FDS_rawToBin(char *filename_raw, char *filename_bin);
 bool FDS_readFlashToFDS(char *filename_fds, int slot);
+
+int fds_to_bin(uint8_t *dst, uint8_t *src, int dstSize);
+bool FDS_convertDisk(char *filename, char *out);
+bool FDS_convertDiskraw03(char *filename, char *out);
