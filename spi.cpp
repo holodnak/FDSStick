@@ -17,6 +17,9 @@ enum {
 	CMD_PAGEERASE = 0xdb,
 	CMD_PAGEPROGRAM = 0x02,
 	CMD_BLOCKERASE = 0xd8,
+	CMD_BLOCKERASE64 = CMD_BLOCKERASE,
+	CMD_BLOCKERASE32 = 0x52,
+	CMD_SECTORERASE = 0x20,
 };
 
 uint32_t spi_readID() {
@@ -138,7 +141,7 @@ static bool unWriteProtect() {
 		 printf("write enable failed.\n");
 		 return false;
 	 }
-	 printf("write enable ok.\n");
+//	 printf("write enable ok.\n");
 	 if(!dev_spiWrite(cmd,2,1,0))
         return false;
     return writeWait(50);
@@ -180,6 +183,30 @@ static bool blockErase(uint32_t addr)
 	return writeWait(2000);
 }
 
+static bool blockErase32(uint32_t addr)
+{
+	uint8_t cmd[] = { CMD_BLOCKERASE32,0,0,0 };
+	if (!writeEnable())
+		return false;
+	cmd[1] = addr >> 16;
+	cmd[2] = addr >> 8;
+	if (!dev_spiWrite(cmd, 4, 1, 0))
+		return false;
+	return writeWait(1600);
+}
+
+static bool sectorErase(uint32_t addr)
+{
+	uint8_t cmd[] = { CMD_SECTORERASE,0,0,0 };
+	if (!writeEnable())
+		return false;
+	cmd[1] = addr >> 16;
+	cmd[2] = addr >> 8;
+	if (!dev_spiWrite(cmd, 4, 1, 0))
+		return false;
+	return writeWait(600);
+}
+
 static bool pageProgram(uint32_t addr, const uint8_t *buf, int size) {
 	uint8_t cmd[PAGESIZE + 4];
 	if (((addr&(PAGESIZE - 1)) + size)>PAGESIZE)
@@ -205,33 +232,66 @@ static bool pageProgram(uint32_t addr, const uint8_t *buf, int size) {
 }
 
 bool spi_writeFlash(const uint8_t *buf, uint32_t addr, uint32_t size) {
-    uint32_t wrote, pageWriteSize;
-    bool ok=false;
-    do {
-		 if (blockErase(addr) == 0) {
-			 printf("spi_WriteFlash: blockErase failed\n");
-			 break;
-		 }
-		 if(!unWriteProtect())
-            { printf("Write protected.\n"); break; }
-//		  return(false);
-        for(wrote=0; wrote<size; wrote+=pageWriteSize) {
-            pageWriteSize=PAGESIZE-(addr & (PAGESIZE-1));   //bytes left in page
-            if(pageWriteSize>size-wrote)
-                pageWriteSize=size-wrote;
-				if (pageProgram(addr + wrote, buf + wrote, pageWriteSize) == 0) {
-					printf("spi_WriteFlash: pageErase failed\n");
-					break;
-				}
-				//				if (!pageWrite(addr + wrote, buf + wrote, pageWriteSize))
-//					break;
-				if((addr+wrote)%0x800==0)
-                printf(".");
-        }
-        printf("\n");
-        ok=(wrote==size);
-    } while(0);
-    return ok;
+	uint32_t wrote, pageWriteSize;
+	bool ok = false;
+	do {
+		if (blockErase(addr) == 0) {
+			printf("spi_WriteFlash: blockErase failed\n");
+			break;
+		}
+		if (!unWriteProtect())
+		{
+			printf("Write protected.\n"); break;
+		}
+		for (wrote = 0; wrote<size; wrote += pageWriteSize) {
+			pageWriteSize = PAGESIZE - (addr & (PAGESIZE - 1));   //bytes left in page
+			if (pageWriteSize>size - wrote)
+				pageWriteSize = size - wrote;
+			if (pageProgram(addr + wrote, buf + wrote, pageWriteSize) == 0) {
+				printf("spi_WriteFlash: pageErase failed\n");
+				break;
+			}
+			//				if (!pageWrite(addr + wrote, buf + wrote, pageWriteSize))
+			//					break;
+			if ((addr + wrote) % 0x800 == 0)
+				printf(".");
+		}
+		printf("\n");
+		ok = (wrote == size);
+	} while (0);
+	return ok;
+}
+
+//QUICK HACK :(
+bool spi_writeFlash2(const uint8_t *buf, uint32_t addr, uint32_t size) {
+	uint32_t wrote, pageWriteSize;
+	bool ok = false;
+	do {
+		if (blockErase32(addr) == 0) {
+			printf("spi_WriteFlash: blockErase32 failed\n");
+			break;
+		}
+		if (!unWriteProtect())
+		{
+			printf("Write protected.\n"); break;
+		}
+		for (wrote = 0; wrote<size; wrote += pageWriteSize) {
+			pageWriteSize = PAGESIZE - (addr & (PAGESIZE - 1));   //bytes left in page
+			if (pageWriteSize>size - wrote)
+				pageWriteSize = size - wrote;
+			if (pageProgram(addr + wrote, buf + wrote, pageWriteSize) == 0) {
+				printf("spi_WriteFlash2: pageProgram failed\n");
+				break;
+			}
+			//				if (!pageWrite(addr + wrote, buf + wrote, pageWriteSize))
+			//					break;
+			if ((addr + wrote) % 0x800 == 0)
+				printf(".");
+		}
+		printf("\n");
+		ok = (wrote == size);
+	} while (0);
+	return ok;
 }
 
 bool spi_writeFile(char *filename, uint32_t addr) {

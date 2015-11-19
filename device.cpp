@@ -87,7 +87,7 @@ bool dev_writeStart() {
 }
 
 bool dev_updateFirmware() {
-    hidbuf[0]=ID_UPDATEFIRMWARE;
+    hidbuf[0]=ID_FIRMWARE_UPDATE;
     hid_send_feature_report(handle, hidbuf, 2);    //reset after update will cause an error, ignore it
     return true;
 }
@@ -114,17 +114,19 @@ bool dev_spiRead(uint8_t *buf, int size, bool holdCS) {
 bool dev_spiWrite(uint8_t *buf, int size, bool initCS, bool holdCS) {
 	int ret;
 
-    if(size>SPI_WRITEMAX)
-        { printf("Write too big.\n"); return false; }
-    hidbuf[0]=ID_SPI_WRITE;
-    hidbuf[1]=size;
-    hidbuf[2]=initCS,
-    hidbuf[3]=holdCS;
-    if(size)
-        memcpy(hidbuf+4, buf, size);
-	 ret = hid_send_feature_report(handle, hidbuf, 4 + size);
-//	 printf("hid_send_feature_report returned %d\n", ret);
-    return ret >= 0;
+	if (size>SPI_WRITEMAX)
+	{
+		printf("Write too big.\n"); return false;
+	}
+	hidbuf[0] = ID_SPI_WRITE;
+	hidbuf[1] = size;
+	hidbuf[2] = initCS,
+		hidbuf[3] = holdCS;
+	if (size)
+		memcpy(hidbuf + 4, buf, size);
+	ret = hid_send_feature_report(handle, hidbuf, 4 + size);
+	//	 printf("hid_send_feature_report returned %d\n", ret);
+	return ret >= 0;
 }
 
 //---------
@@ -161,4 +163,20 @@ bool dev_writeDisk(uint8_t *buf, int size) {
     hidbuf[0]=ID_DISK_WRITE;
     memcpy(hidbuf+1, buf, size);
     return hid_write(handle, hidbuf, DISK_WRITEMAX+1) >= 0;     // WRITEMAX+reportID
+}
+
+
+//--------------------
+
+bool dev_fwWrite(uint8_t *buf, int size, bool initCS, bool holdCS) {
+	int ret;
+
+	hidbuf[0] = ID_FIRMWARE_WRITE;
+	hidbuf[1] = size;
+	hidbuf[2] = initCS,
+	hidbuf[3] = holdCS;
+	if (size)
+		memcpy(hidbuf + 4, buf, size);
+	ret = hid_send_feature_report(handle, hidbuf, 4 + size);
+	return ret >= 0;
 }

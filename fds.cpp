@@ -30,7 +30,7 @@ static void raw03_to_bin(uint8_t *raw, int rawSize, uint8_t **_bin, int *_binSiz
 
 // allocate buffer and read whole file
 bool loadFile(char *filename, uint8_t **buf, int *filesize) {
-    FILE *f=NULL;
+	FILE *f=NULL;
     int size;
     bool result=false;
     do {
@@ -1096,4 +1096,53 @@ bool FDS_convertDisk(char *filename, char *out) {
 	free(bin);
 	free(inbuf);
 	return true;
+}
+
+
+bool FDS_bintofds(char *filename, char *out)
+{
+	enum {
+		RAWSIZE = SLOTSIZE * 8,
+	};
+
+	static uint8_t fwnesHdr[16] = { 0x46, 0x44, 0x53, 0x1a, };
+
+	FILE *f;
+	uint8_t *bin, *raw, *fds;
+	bool result = true;
+	int filesize;
+
+	if (!loadFile(filename, &bin, &filesize))
+	{
+		printf("Can't read %s\n", filename);
+		return false;
+	}
+
+	f = fopen(out, "wb");
+	if (!f) {
+		printf("Can't create %s\n", out);
+		return false;
+	}
+
+	printf("Writing %s\n", out);
+	fwnesHdr[4] = 0;
+	fwrite(fwnesHdr, 1, sizeof(fwnesHdr), f);
+
+	raw = (uint8_t*)malloc(RAWSIZE);      //..to raw03
+	fds = (uint8_t*)malloc(FDSSIZE);      //..to FDS
+
+	bin_to_raw03(bin, raw, SLOTSIZE, RAWSIZE);
+	if (!raw03_to_fds(raw, fds, RAWSIZE)) {
+		result = false;
+	}
+
+	fseek(f, 0, SEEK_SET);
+	fwrite(fwnesHdr, 1, sizeof(fwnesHdr), f);      //update disk side count
+	fwrite(fds, 1, 65500, f); 
+
+	free(fds);
+	free(raw);
+	free(bin);
+	fclose(f);
+	return result;
 }

@@ -20,7 +20,7 @@ bool firmware_update() {
         }
 
         dev_updateFirmware();   //start update, device will reset itself
-        sleep_ms(1000);
+        sleep_ms(2000);
 
         if(!dev_open()) {
             printf("Open failed.\n");

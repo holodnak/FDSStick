@@ -22,6 +22,10 @@ enum {
     ID_DISK_READ,
     ID_DISK_WRITE_START,
     ID_DISK_WRITE,
+
+	ID_FIRMWARE_READ = 0x40,
+	ID_FIRMWARE_WRITE,
+	ID_FIRMWARE_UPDATE,
 };
 
 //These get filled on dev_open()
@@ -42,3 +46,5 @@ bool dev_readStart();
 int dev_readDisk(uint8_t *buf);
 bool dev_writeStart();
 bool dev_writeDisk(uint8_t *buf, int size);
+
+bool dev_fwWrite(uint8_t *buf, int size, bool initCS, bool holdCS);

@@ -1,5 +1,7 @@
 #pragma once
 
+bool loadFile(char *filename, uint8_t **buf, int *filesize);
+
 //void FDStest(char *name);
 bool FDS_readDisk(char *filename_raw, char *filename_bin, char *filename_fds);
 bool FDS_writeDisk(char *name);
