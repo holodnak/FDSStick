@@ -498,7 +498,7 @@ bool FDS_writeFlash(char *filename, int slot) {
 //                ((uint16_t*)outbuf)[FILENAMELENGTH-1]=0;
 					 strncpy((char*)outbuf, shortName, 240);
             }
-            spi_writeFlash(outbuf, (slot+side-1)*SLOTSIZE, SLOTSIZE);
+            spi_writeFlash(outbuf, (slot+side)*SLOTSIZE, SLOTSIZE);
         }
         pos+=FDSSIZE;
         side++;
@@ -554,8 +554,9 @@ void hexdump(char *desc, void *addr, int len)
 bool FDS_list() {
     uint8_t buf[256];
     int side=0;
-    for(int slot=1;slot<=dev_slots;slot++) {
-        if(!spi_readFlash((slot-1)*SLOTSIZE,buf,256))
+	 printf("\n");
+    for(int slot=1;slot<dev_slots;slot++) {
+        if(!spi_readFlash((slot)*SLOTSIZE,buf,256))
             return false;
 
         if(buf[0]==0xff) {          //empty
@@ -940,7 +941,7 @@ bool FDS_readFlashToFDS(char *filename_fds, int slot) {  //slot 1..N
 
     int side=0;
     for(; side+slot<=dev_slots; side++) {
-        if(!spi_readFlash((slot+side-1)*SLOTSIZE, bin, SLOTSIZE)) {
+        if(!spi_readFlash((slot+side)*SLOTSIZE, bin, SLOTSIZE)) {
             result=false;
             break;
         }

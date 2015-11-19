@@ -13,7 +13,7 @@ bool FW_writeFlash(char *filename)
 	FILE *fp;
 	uint8_t *buf = 0;
 	uint32_t *buf32, chksum;
-	int i, filesize, pos;
+	int i, filesize;
 
 	if ((fp = fopen(filename, "rb")) == 0) {
 		printf("unable to open firmware '%s'\n", filename);
@@ -65,6 +65,55 @@ bool FW_writeFlash(char *filename)
 	return true;
 }
 
+char loaderid[] = "]|<=--LOADER.FDS--=>|[";
+
+bool DetectLoader(uint8_t *buf)
+{
+	int pos, len, count;
+	uint8_t byte;
+
+	for (pos = 0; pos<65500;) {
+
+		//read a byte
+		byte = buf[pos++];
+
+		//first byte matches
+		if (byte == loaderid[0]) {
+			len = strlen(loaderid);
+			for (count = 0; byte == loaderid[count] && count < len; count++) {
+				byte = buf[pos + count];
+			}
+			if (count == len) {
+				len = buf[pos + count];
+				printf("Valid loader image found, version %d.%02d\n", len / 100, len % 100);
+				return(true);
+			}
+		}
+	}
+	return(false);
+}
+
+bool WriteLoader(char *fn)
+{
+	bool ret = false;
+	uint8_t *buf;
+	int len;
+
+	if (loadFile(fn, &buf, &len) == false) {
+		printf("Error loading file '%s'\n", fn);
+		return(false);
+	}
+	if (DetectLoader(buf) == false) {
+		printf("Specified image doesnt appear to be the loader.\n");
+	}
+	else {
+		ret = FDS_writeFlash(fn, 0);
+	}
+	free(buf);
+	return(ret);
+}
+
+
 void app_exit(int exitcode) {
     dev_close();
 //	 system("pause");
@@ -101,7 +150,7 @@ bool FDS_bintofds(char *filename, char *out);
 
 int main(int argc, char** argv) {
     setbuf(stdout,NULL);
-    printf("FDSStick console app (" __DATE__ ")\n");
+	 printf("FDSemu console app (" __DATE__ "), based upon code by loopy");
 
     if(!dev_open() || argc<2 || argv[1][0]!='-') {
         help();
@@ -134,6 +183,15 @@ int main(int argc, char** argv) {
 			 if (argc>3)
 				 sscanf(argv[3], "%i", &slot);
 			 success = FDS_writeFlash(argv[2], slot);
+		 }
+		 app_exit(0);
+		 break;
+
+	 case 'L': //update the loader
+		 if (argc<3)
+			 help();
+		 {
+			 success = WriteLoader(argv[2]);
 		 }
 		 app_exit(0);
 		 break;

@@ -38,7 +38,7 @@ uint32_t spi_readID() {
 
 uint32_t spi_readFlashSize() {
 	uint32_t id=spi_readID();
-	printf("flash size id = %X\n", id);
+	printf("Flash ID is $%X\n", id);
 	switch(id) {
 		case 0x138020: // ST25PE40, M25PE40: 4Mbit (512kB)
 			return 0x80000;
