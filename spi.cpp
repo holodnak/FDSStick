@@ -11,8 +11,9 @@ enum {
     CMD_READSTATUS=0x05,
     CMD_WRITEENABLE=0x06,
     CMD_READID=0x9f,
-    CMD_READDATA=0x03,
-    CMD_WRITESTATUS=0x01,
+	CMD_READDATA = 0x03,
+	CMD_WRITEDATA = 0x02,
+	CMD_WRITESTATUS=0x01,
 	CMD_PAGEWRITE = 0x0a,
 	CMD_PAGEERASE = 0xdb,
 	CMD_PAGEPROGRAM = 0x02,
@@ -326,4 +327,21 @@ bool spi_erasePage(int addr) {
     if(!dev_spiWrite(cmd, 4, 1, 0))
         return false;
     return writeWait(2000);
+}
+
+bool spi_writeSram(const uint8_t *buf, uint32_t addr, int size) {
+	static uint8_t cmd[4] = { CMD_WRITEDATA,0,0,0 };
+	cmd[2] = addr >> 8;
+	cmd[3] = addr;
+
+	printf("outputting write command\n");
+	if (!dev_sramWrite(cmd, 3, 1, 1))
+		return false;
+
+	for (; size>0; size -= SPI_WRITEMAX) {
+		if (!dev_sramWrite((uint8_t*)buf, size>SPI_WRITEMAX ? SPI_WRITEMAX : size, 0, size>SPI_WRITEMAX))
+			return false;
+		buf += SPI_WRITEMAX;
+	}
+	return true;
 }

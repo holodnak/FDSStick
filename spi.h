@@ -12,3 +12,4 @@ bool spi_writeFlash(const uint8_t *buf, uint32_t addr, uint32_t size);
 bool spi_writeFlash2(const uint8_t *buf, uint32_t addr, uint32_t size);
 bool spi_erasePage(int addr);
 bool spi_readFlash(int addr, uint8_t *buf, int size);
+bool spi_writeSram(const uint8_t *buf, uint32_t addr, int size);

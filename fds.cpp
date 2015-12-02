@@ -257,16 +257,25 @@ bool block_decode(uint8_t *dst, uint8_t *src, int *inP, int *outP, int srcSize, 
     return true;
 }
 
+__inline uint8_t raw_to_raw03_byte(uint8_t raw)
+{
+	if (raw < 0x50)
+		return(3);
+	else if (raw < 0x70)
+		return(0);
+	else if (raw < 0xA0)
+		return(1);
+	else if (raw < 0xD0)
+		return(2);
+	return(3);
+}
+
 //Turn raw data from adapter to pulse widths (0..3)
 //Input capture clock is 6MHz.  At 96.4kHz (FDS bitrate), 1 bit ~= 62 clocks
 //We could be clever about this and account for drive speed fluctuations, etc. but this will do for now
 static void raw_to_raw03(uint8_t *raw, int rawSize) {
     for(int i=0; i<rawSize; ++i) {
-        if(raw[i]<0x30) raw[i]=3;
-        else if(raw[i]<0x50) raw[i]=0;      //0=1 bit
-        else if(raw[i]<0x70) raw[i]=1;      //1=1.5 bits
-        else if(raw[i]<0xa0) raw[i]=2;      //2=2 bits
-        else raw[i]=3;                      //3=out of range
+		 raw[i] = raw_to_raw03_byte(raw[i]);
     }
 }
 
@@ -406,7 +415,80 @@ static bool writeDisk(uint8_t *bin, int binSize) {
     return !fail;
 }
 
+void hexdump(char*, void*, int);
+
+static bool writeDisk2(uint8_t *bin, int binSize) {
+	printf("writeDisk2: sending bin image to adaptor, size = %d\n", binSize);
+
+	hexdump("bin", bin+ 3537, 256);
+
+	spi_writeSram(bin, 0, binSize);
+
+	if (!dev_writeStart())
+		return false;
+
+	return(true);
+
+}
+
 bool FDS_writeDisk(char *filename) {
+	enum {
+		LEAD_IN = DEFAULT_LEAD_IN / 8,
+		DISKSIZE = 0x11000,               //whole disk contents including lead-in
+	};
+
+	uint8_t *inbuf = 0;       //.FDS buffer
+	uint8_t *bin = 0;         //.FDS with gaps/CRC
+	uint8_t *zero = 0;
+	int filesize;
+	int binSize;
+
+	if (!loadFile(filename, &inbuf, &filesize))
+	{
+		printf("Can't read %s\n", filename); return false;
+	}
+
+	bin = (uint8_t*)malloc(DISKSIZE);
+	zero = (uint8_t*)malloc(0x10000);
+	memset(zero, 0, 0x10000);
+
+	int inpos = 0, side = 0;
+	if (inbuf[0] == 'F')
+		inpos = 16;      //skip fwNES header
+
+	filesize -= (filesize - inpos) % FDSSIZE;  //truncate down to whole disk
+
+	char prompt;
+	do {
+		printf("Side %d\n", side + 1);
+
+		spi_writeSram(zero, 0, 0x10000);
+		memset(bin, 0, LEAD_IN);
+		binSize = fds_to_bin(bin + LEAD_IN, inbuf + inpos, DISKSIZE - LEAD_IN);
+		if (!binSize)
+			break;
+		if (!writeDisk2(bin, binSize + LEAD_IN))
+			break;
+		inpos += FDSSIZE;
+		side++;
+
+		printf("finished write, inpos = %d, filesize = %d, inbuf[inpos] = %X", inpos, filesize, inbuf[inpos]);
+
+		//prompt for disk change
+		prompt = 0;
+		if (inpos<filesize && inbuf[inpos] == 0x01) {
+			printf("Push ENTER for next disk side\n");
+			prompt = readKb();
+		}
+	} while (prompt == 0x0d);
+
+	free(bin);
+	free(zero);
+	free(inbuf);
+	return true;
+}
+
+/*bool FDS_writeDisk(char *filename) {
 	enum {
 		LEAD_IN = DEFAULT_LEAD_IN / 8,
 		DISKSIZE = 0x11000,               //whole disk contents including lead-in
@@ -454,7 +536,7 @@ bool FDS_writeDisk(char *filename) {
 	free(bin);
 	free(inbuf);
 	return true;
-}
+}*/
 
 //slot 1..n
 bool FDS_writeFlash(char *filename, int slot) {

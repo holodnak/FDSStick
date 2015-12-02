@@ -129,6 +129,24 @@ bool dev_spiWrite(uint8_t *buf, int size, bool initCS, bool holdCS) {
 	return ret >= 0;
 }
 
+bool dev_sramWrite(uint8_t *buf, int size, bool initCS, bool holdCS) {
+	int ret;
+
+	if (size>SPI_WRITEMAX)
+	{
+		printf("Write too big.\n"); return false;
+	}
+	hidbuf[0] = ID_SRAM_WRITE;
+	hidbuf[1] = size;
+	hidbuf[2] = initCS,
+		hidbuf[3] = holdCS;
+	if (size)
+		memcpy(hidbuf + 4, buf, size);
+	ret = hid_send_feature_report(handle, hidbuf, 4 + size);
+	//	 printf("hid_send_feature_report returned %d\n", ret);
+	return ret >= 0;
+}
+
 //---------
 
 static uint8_t read_sequence;
