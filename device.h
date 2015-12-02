@@ -32,7 +32,7 @@ enum {
 };
 
 //These get filled on dev_open()
-extern uint8_t dev_fwVersion;
+extern uint16_t dev_fwVersion;
 extern int dev_flashSize;           //in bytes
 extern int dev_slots;
 

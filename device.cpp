@@ -19,7 +19,7 @@
 
 int dev_flashSize;
 int dev_slots;
-uint8_t dev_fwVersion;
+uint16_t dev_fwVersion;
 
 static hid_device *handle=NULL;
 static uint8_t hidbuf[256];
@@ -44,7 +44,7 @@ bool dev_open() {
 		 handle = hid_open_path(cur_dev->path);
 	 }
     if(handle) {
-        dev_fwVersion = cur_dev->release_number&0xff;
+        dev_fwVersion = cur_dev->release_number;
         dev_flashSize = spi_readFlashSize();
         dev_slots = dev_flashSize/SLOTSIZE;
         wprintf(L"Opened %s (%04X:%04X:%04X:%s:%dM)\n", cur_dev->product_string, cur_dev->vendor_id, cur_dev->product_id, cur_dev->release_number, cur_dev->serial_number, dev_flashSize/0x20000);

@@ -150,7 +150,7 @@ bool FDS_bintofds(char *filename, char *out);
 
 int main(int argc, char** argv) {
     setbuf(stdout,NULL);
-	 printf("FDSemu console app (" __DATE__ "), based upon code by loopy");
+	 printf("FDSemu console app (" __DATE__ "), based upon code by loopy\n");
 
     if(!dev_open() || argc<2 || argv[1][0]!='-') {
         help();
