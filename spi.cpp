@@ -43,8 +43,14 @@ uint32_t spi_readFlashSize() {
 	switch(id) {
 		case 0x138020: // ST25PE40, M25PE40: 4Mbit (512kB)
 			return 0x80000;
+		case 0x158020: // M25PE80: 8Mbit (1024kB)
+			return 0x100000;
 		case 0x1440EF: // W25Q80DV (1mB)
 			return 0x100000;
+		case 0x1640EF: // W25Q32FV (4mB)
+			return 0x400000;
+		case 0x1740EF: // W25Q64FV (8mB)
+			return 0x800000;
 		case 0x174001: // S25FL164K (8mB)
 			return 0x800000;
 	}
@@ -240,10 +246,6 @@ bool spi_writeFlash(const uint8_t *buf, uint32_t addr, uint32_t size) {
 			printf("spi_WriteFlash: blockErase failed\n");
 			break;
 		}
-		if (!unWriteProtect())
-		{
-			printf("Write protected.\n"); break;
-		}
 		for (wrote = 0; wrote<size; wrote += pageWriteSize) {
 			pageWriteSize = PAGESIZE - (addr & (PAGESIZE - 1));   //bytes left in page
 			if (pageWriteSize>size - wrote)
@@ -272,10 +274,6 @@ bool spi_writeFlash2(const uint8_t *buf, uint32_t addr, uint32_t size) {
 			printf("spi_WriteFlash: blockErase32 failed\n");
 			break;
 		}
-		if (!unWriteProtect())
-		{
-			printf("Write protected.\n"); break;
-		}
 		for (wrote = 0; wrote<size; wrote += pageWriteSize) {
 			pageWriteSize = PAGESIZE - (addr & (PAGESIZE - 1));   //bytes left in page
 			if (pageWriteSize>size - wrote)
@@ -284,8 +282,6 @@ bool spi_writeFlash2(const uint8_t *buf, uint32_t addr, uint32_t size) {
 				printf("spi_WriteFlash2: pageProgram failed\n");
 				break;
 			}
-			//				if (!pageWrite(addr + wrote, buf + wrote, pageWriteSize))
-			//					break;
 			if ((addr + wrote) % 0x800 == 0)
 				printf(".");
 		}
@@ -334,7 +330,7 @@ bool spi_writeSram(const uint8_t *buf, uint32_t addr, int size) {
 	cmd[2] = addr >> 8;
 	cmd[3] = addr;
 
-	printf("outputting write command\n");
+//	printf("outputting write command\n");
 	if (!dev_sramWrite(cmd, 3, 1, 1))
 		return false;
 

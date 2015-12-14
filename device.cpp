@@ -87,7 +87,7 @@ bool dev_writeStart() {
 }
 
 bool dev_updateFirmware() {
-    hidbuf[0]=ID_FIRMWARE_UPDATE;
+    hidbuf[0]=ID_UPDATEFIRMWARE;
     hid_send_feature_report(handle, hidbuf, 2);    //reset after update will cause an error, ignore it
     return true;
 }

@@ -418,9 +418,9 @@ static bool writeDisk(uint8_t *bin, int binSize) {
 void hexdump(char*, void*, int);
 
 static bool writeDisk2(uint8_t *bin, int binSize) {
-	printf("writeDisk2: sending bin image to adaptor, size = %d\n", binSize);
+//	printf("writeDisk2: sending bin image to adaptor, size = %d\n", binSize);
 
-	hexdump("bin", bin+ 3537, 256);
+//	hexdump("bin", bin+ 3537, 256);
 
 	spi_writeSram(bin, 0, binSize);
 
@@ -472,13 +472,15 @@ bool FDS_writeDisk(char *filename) {
 		inpos += FDSSIZE;
 		side++;
 
-		printf("finished write, inpos = %d, filesize = %d, inbuf[inpos] = %X", inpos, filesize, inbuf[inpos]);
-
+//		printf("finished write, inpos = %d, filesize = %d, inbuf[inpos] = %X", inpos, filesize, inbuf[inpos]);
 		//prompt for disk change
 		prompt = 0;
 		if (inpos<filesize && inbuf[inpos] == 0x01) {
-			printf("Push ENTER for next disk side\n");
+			printf("\nPlease wait for disk activity to stop before pressing ENTER to write the next disk side.\n");
 			prompt = readKb();
+		}
+		else {
+			printf("\nDisk image sent to SRAM on device and is currently writing.\nPlease wait for disk activity to stop before removing disk.\n");
 		}
 	} while (prompt == 0x0d);
 
@@ -538,6 +540,18 @@ bool FDS_writeDisk(char *filename) {
 	return true;
 }*/
 
+uint32_t chksum_calc(uint8_t *buf, int size)
+{
+	uint32_t ret = 0;
+	uint32_t *data = (uint32_t*)buf;
+	int i;
+
+	for (i = 0; i < size / 4; i++) {
+		ret ^= buf[i];
+	}
+	return(ret);
+}
+
 //slot 1..n
 bool FDS_writeFlash(char *filename, int slot) {
     enum { FILENAMELENGTH=120, };   //number of characters including null
@@ -561,8 +575,14 @@ bool FDS_writeFlash(char *filename, int slot) {
         printf("Side %d\n", side+1);
         if(fds_to_bin(outbuf+FLASHHEADERSIZE, inbuf+pos, SLOTSIZE-FLASHHEADERSIZE)) {
             memset(outbuf,0,FLASHHEADERSIZE);
-            outbuf[243]=DEFAULT_LEAD_IN & 0xff;
-            outbuf[244]=DEFAULT_LEAD_IN / 256;
+				uint32_t chksum = chksum_calc(outbuf + FLASHHEADERSIZE, SLOTSIZE - FLASHHEADERSIZE);
+				outbuf[240] = (uint8_t)(chksum >> 0);
+				outbuf[241] = (uint8_t)(chksum >> 8);
+				outbuf[242] = (uint8_t)(chksum >> 16);
+				outbuf[243] = (uint8_t)(chksum >> 24);
+				outbuf[244] = DEFAULT_LEAD_IN & 0xff;
+            outbuf[245] = DEFAULT_LEAD_IN / 256;
+
             if(side==0) {
                 //strip path from filename
                 char *shortName=strrchr(filename,'/');      // ...dir/file.fds
